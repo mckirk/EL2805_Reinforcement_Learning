@@ -297,6 +297,14 @@ class Maze:
                 t +=1;
         return path
 
+    def surival_rate(self, start, policy, method, exit, num = 10000):
+        won = 0;
+        for i in range(num):
+            path = self.simulate(start, policy, method);
+            if path[-1].player_pos == exit:
+                won += 1;
+        
+        return won/num
 
     def show(self):
         print('The states are :')
