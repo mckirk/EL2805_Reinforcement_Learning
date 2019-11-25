@@ -64,11 +64,6 @@ class Maze:
     def __states(self):
         states = dict();
         map = dict();
-        # TODO No win and eaten states??
-        # states[0] = "Win"
-        # states[1] = "Eaten"
-        # map["Win"] = 0
-        # map["Eaten"] = 1
         s = 0;
         for i in range(self.maze.shape[0]):
             for j in range(self.maze.shape[1]):
@@ -78,6 +73,11 @@ class Maze:
                             states[s] = (i,j,k,l);
                             map[(i,j,k,l)] = s;
                             s += 1;
+        # terminal states for "Eaten by the minotaur" and "Escaped"
+        # states[s] = "EATEN"
+        # states[s+1] = "ESCAPED"
+        # map["EATEN"] = s
+        # map["ESCAPED"] = s+1
         return states, map
 
     def __move(self, state, action):
@@ -130,9 +130,24 @@ class Maze:
         return transition_probabilities;
 
     def __compute_prob(self, s, next_s):
-        # the minotaur moves with prob 1/4 to neighbouring grid points
-        # the fact that it can't move out of the grid is accounted for in __move
-        return 1/4
+        state_coords = self.states[s]
+        if state_coords == "EATEN" or state_coords == "ESCAPED":
+            # with probability 1 the minotaur will stay in a terminal state
+            return 1
+        else:
+            mino_x = state_coords[2]
+            mino_y = state_coords[3]
+            x_on_wall = (mino_x == 0 or mino_x == self.maze.shape[0] -1)
+            y_on_wall = (mino_y == 0 or mino_y == self.maze.shape[1] -1)
+            if x_on_wall and y_on_wall:
+                # minotaur in a corner --> the current move is one of the two possible ones
+                return 1/2
+            elif x_on_wall or y_on_wall:
+                # minotaur on a wall --> the current move is one of the three possible ones
+                return 1/3
+            else:
+                # minotaur not on a wall at all. --> the current move is one of the 4 possibilities
+                return 1/4
 
     def __rewards(self, weights=None, random_rewards=None):
         rewards = np.zeros((self.n_states, self.n_actions))
