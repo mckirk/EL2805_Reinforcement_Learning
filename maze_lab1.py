@@ -34,10 +34,11 @@ class Maze:
     }
 
     # Reward values
-    STEP_REWARD = -1
-    GOAL_REWARD = 0
+    STEP_REWARD = 0
+    GOAL_REWARD = 1
     IMPOSSIBLE_REWARD = -100
-    MINOTAUR_REWARD = -100
+    MINOTAUR_REWARD = -10
+
 
     def __init__(self, maze, weights=None, random_rewards=False):
         """ Constructor of the environment Maze.
@@ -129,47 +130,51 @@ class Maze:
         return transition_probabilities;
 
     def __compute_prob(self, s, next_s):
-        # TODO this should be 1/2 in corners and 1/3 on edges
+        # the minotaur moves with prob 1/4 to neighbouring grid points
+        # the fact that it can't move out of the grid is accounted for in __move
         return 1/4
 
     def __rewards(self, weights=None, random_rewards=None):
-
-        rewards = np.zeros((self.n_states, self.n_actions));
+        rewards = np.zeros((self.n_states, self.n_actions))
 
         # If the rewards are not described by a weight matrix
         if weights is None:
             for s in range(self.n_states):
                 for a in range(self.n_actions):
-                    next_s = self.__move(s,a);
+                    next_s = self.__move(s,a)
+                    agent_stayed = self.states[s][:2] == self.states[next_s][:2]
                     # Reward for hitting a wall
-                    if s == next_s and a != self.STAY:
-                        rewards[s,a] = self.IMPOSSIBLE_REWARD;
+                    if agent_stayed and a != self.STAY:
+                        rewards[s,a] = self.IMPOSSIBLE_REWARD
                     # Reward for reaching the exit
-                    elif s == next_s and self.maze[self.states[next_s]] == 2:
-                        rewards[s,a] = self.GOAL_REWARD;
+                    # TODO: why does the agent need to stay to receive the goal reward?
+                    elif agent_stayed and self.maze[self.states[next_s][:2]] == 2:
+                        rewards[s,a] = self.GOAL_REWARD
+                    #TODO I'm not entirely sure if this is current
+                    elif self.states[next_s][:2] == self.states[next_s][2:]:
+                        rewards[s,a] = self.MINOTAUR_REWARD
                     # Reward for taking a step to an empty cell that is not the exit
                     else:
-                        rewards[s,a] = self.STEP_REWARD;
+                        rewards[s,a] = self.STEP_REWARD
 
                     # If there exists trapped cells with probability 0.5
                     if random_rewards and self.maze[self.states[next_s]]<0:
-                        row, col = self.states[next_s];
+                        row, col = self.states[next_s]
                         # With probability 0.5 the reward is
-                        r1 = (1 + abs(self.maze[row, col])) * rewards[s,a];
+                        r1 = (1 + abs(self.maze[row, col])) * rewards[s,a]
                         # With probability 0.5 the reward is
-                        r2 = rewards[s,a];
+                        r2 = rewards[s,a]
                         # The average reward
-                        rewards[s,a] = 0.5*r1 + 0.5*r2;
+                        rewards[s,a] = 0.5*r1 + 0.5*r2
         # If the weights are described by a weight matrix
         else:
             for s in range(self.n_states):
                  for a in range(self.n_actions):
                      next_s = self.__move(s,a);
-                     i,j,k,l = self.states[next_s];
+                     i,j,k,l = self.states[next_s]
                      # Simply put the reward as the weights o the next state.
-                     rewards[s,a] = weights[i][j];
-
-        return rewards;
+                     rewards[s,a] = weights[i][j]
+        return rewards
 
     def simulate(self, start, policy, method):
         if method not in methods:
@@ -263,9 +268,9 @@ def dynamic_programming(env, horizon):
     V[:, T]      = np.max(Q,1);
     policy[:, T] = np.argmax(Q,1);
 
-    # The dynamic programming bakwards recursion
+    # The dynamic programming backwards recursion
     for t in range(T-1,-1,-1):
-        # Update the value function acccording to the bellman equation
+        # Update the value function according to the bellman equation
         for s in range(n_states):
             for a in range(n_actions):
                 # Update of the temporary Q values
@@ -370,6 +375,9 @@ def draw_maze(maze):
         cell.set_width(1.0/cols);
 
 def animate_solution(maze, path):
+    # the minotaur starts at the exit
+    exit = path[0][2:]
+    print("EXIT = ", exit)
 
     # Map a color to each cell in the maze
     col_map = {0: WHITE, 1: BLACK, 2: LIGHT_GREEN, -6: LIGHT_RED, -1: LIGHT_RED}
@@ -407,17 +415,28 @@ def animate_solution(maze, path):
 
 
     # Update the color at each frame
+    out = False
     for i in range(len(path)):
         grid.get_celld()[(path[i][:2])].set_facecolor(LIGHT_ORANGE)
         grid.get_celld()[(path[i][:2])].get_text().set_text('Player')
+        grid.get_celld()[(path[i][2:])].set_facecolor(LIGHT_PURPLE)
+        grid.get_celld()[(path[i][2:])].get_text().set_text('Minotaur')
         if i > 0:
-            if path[i][:2] == path[i-1][:2]:
+            if not out:
+                # set previous player position back to white
+                grid.get_celld()[(path[i-1][:2])].set_facecolor(col_map[maze[path[i-1][:2]]])
+                grid.get_celld()[(path[i-1][:2])].get_text().set_text('')
+            if path[i][:2] == exit:
                 grid.get_celld()[(path[i][:2])].set_facecolor(LIGHT_GREEN)
                 grid.get_celld()[(path[i][:2])].get_text().set_text('Player is out')
-            else:
-                grid.get_celld()[(path[i-1][:2])].set_facecolor(col_map[maze[path[i-1]]])
-                grid.get_celld()[(path[i-1][:2])].get_text().set_text('')
+                out = True
+
+            # set previous minotaur position back to white
+            grid.get_celld()[(path[i-1][2:])].set_facecolor(col_map[maze[path[i-1][2:]]])
+            grid.get_celld()[(path[i-1][2:])].get_text().set_text('')
+        # This animation only works in ipython notebook
         display.display(fig)
-        # plt.show(fig)
+        #plt.clear_output(wait=True)
         display.clear_output(wait=True)
         time.sleep(1)
+    #plt.show()

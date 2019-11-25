@@ -19,7 +19,7 @@ maze = np.array([
     [0, 0, 1, 0, 0, 0, 0],
     [0, 0, 1, 0, 1, 0, 0],
     [0, 0, 1, 0, 1, 1, 1],
-    [0, 0, 0, 0, 1, 0, 0],
+    [0, 0, 1, 0, 1, 0, 0],
     [0, 0, 0, 0, 0, 0, 0],
     [0, 1, 1, 1, 1, 1, 0],
     [0, 0, 0, 1, 2, 0, 0]
@@ -44,8 +44,9 @@ w = np.array([
 ])
 
 # Create an environment maze
-env = mz.Maze(maze, weights=w)
-env.show()
+#env = mz.Maze(maze, weights=w)
+env = mz.Maze(maze)
+#env.show()
 
 # Finite horizon
 horizon = 20
@@ -55,6 +56,8 @@ V, policy= mz.dynamic_programming(env, horizon);
 method = 'DynProg';
 start  = (0,0,6,5);
 path = env.simulate(start, policy, method);
+for elem in path:
+    print(elem)
 # Show the shortest path
 # this animation only works on ipython notebook
-mz.animate_solution(maze, path)
+#mz.animate_solution(maze, path)
