@@ -577,3 +577,18 @@ def draw_maze(maze):
     for cell in tc:
         cell.set_height(1.0/rows);
         cell.set_width(1.0/cols);
+
+def survival_rates(maze, exit, T_range, minotaur_stay, num = 10000):
+    env = Maze(maze, minotaur_stay = minotaur_stay)
+
+    sr = []
+
+    method = "DynProg"
+    start = State(Pos(0,0), exit)
+
+    for T in T_range:
+        V, policy = dynamic_programming(env, T)
+
+        sr.append(env.surival_rate(start, policy, method, exit))
+
+    return sr
