@@ -210,14 +210,13 @@ class Maze:
                     for next_state in next_states:
                         agent_stayed = state.player_pos == next_state.player_pos
 
-                        # Reward for hitting a wall
-                        if self.maze[next_state.player_pos.unpack()] == 2:
-                            cumulative_reward += self.GOAL_REWARD
-                        # Reward for reaching the exit
-                        # TODO: why does the agent need to stay to receive the goal reward?
-                        elif next_state.player_pos == next_state.minotaur_pos:
+                        # Minotaur finds, minotaur eats
+                        if next_state.player_pos == next_state.minotaur_pos:
                             cumulative_reward += self.MINOTAUR_REWARD
-                        #TODO I'm not entirely sure if this is current
+                        # Reward for reaching the exit
+                        elif self.maze[next_state.player_pos.unpack()] == 2:
+                            cumulative_reward += self.GOAL_REWARD
+                        # Reward for hitting a wall
                         elif agent_stayed and a != self.STAY:
                             cumulative_reward += self.IMPOSSIBLE_REWARD
                         # Reward for taking a step to an empty cell that is not the exit
@@ -309,7 +308,8 @@ class Maze:
         won = 0;
         for i in range(num):
             path = self.simulate(start, policy, method, survival_factor = survival_factor);
-            if path[-1].player_pos == exit:
+            last_state = path[-1]
+            if not last_state.is_dead() and last_state.player_pos == exit:
                 won += 1;
         
         return won/num
@@ -371,10 +371,10 @@ class Maze:
         won = 0
         dead = 0
         for state, prob in prob_states.items():
-            if state.player_pos == exit:
-                won += prob
-            elif state.is_dead():
+            if state.is_dead():
                 dead += prob
+            elif state.player_pos == exit:
+                won += prob
 
         print("T = {}, win {:06.2%}, dead {:06.2%}".format(horizon-1, won, dead))
 
