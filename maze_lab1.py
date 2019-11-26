@@ -87,9 +87,13 @@ class Maze:
     MINOTAUR_REWARD = 0
 
 
-    def __init__(self, maze, weights=None, random_rewards=False, minotaur_stay=False):
+    def __init__(self, maze, weights=None, random_rewards=False, minotaur_stay=False, avoid_minotaur = False):
         """ Constructor of the environment Maze.
         """
+
+        if avoid_minotaur:
+            self.MINOTAUR_REWARD = -1
+
         self.maze                     = maze;
         self.minotaur_stay            = minotaur_stay
         self.actions                  = self.__actions();
@@ -247,7 +251,7 @@ class Maze:
 
         return rewards
 
-    def simulate(self, start, policy, method):
+    def simulate(self, start, policy, method, survival_factor = None):
         if method not in methods:
             error = 'ERROR: the argument method must be in {}'.format(methods);
             raise NameError(error);
@@ -261,7 +265,7 @@ class Maze:
             s = start;
             # Add the starting position in the maze to the path
             path.append(start);
-            while t < horizon-1:
+            while t < horizon:
                 # Move to next state given the policy and the current state
                 next_s = self.__move(s, policy[self.map[s],t]);
                 # Add the position in the maze corresponding to the next state
@@ -272,32 +276,39 @@ class Maze:
                 s = next_s
         if method == 'ValIter':
             # Initialize current state, next state and time
-            t = 1;
+            t = 0;
             s = start;
-            # Add the starting position in the maze to the path
-            path.append(start);
-            # Move to next state given the policy and the current state
-            next_s = self.__move(s, policy[self.map[s]]);
-            # Add the position in the maze corresponding to the next state
-            # to the path
-            path.append(next_s);
+
             # Loop while state is not the goal state
-            while s != next_s:
+            while True:
+                path.append(s)
+
+                # if our life is geometrically distributed, check whether we're still alive
+                if survival_factor is not None:
+                    if random.random() > survival_factor:
+                        break
+
+                if s.is_dead():
+                    break
+
+                if self.maze[s.player_pos.unpack()] == 2:
+                    break
+
+                # Move to next state given the policy and the current state
+                next_s = self.__move(s, policy[self.map[s]]);
+
+                # Update time and state for next iteration
+                t += 1;
+
                 # Update state
                 s = next_s;
-                # Move to next state given the policy and the current state
-                next_s = self.__move(s, policy[s]);
-                # Add the position in the maze corresponding to the next state
-                # to the path
-                path.append(next_s)
-                # Update time and state for next iteration
-                t +=1;
+
         return path
 
-    def survival_rate(self, start, policy, method, exit, num = 10000):
+    def survival_rate(self, start, policy, method, exit, num = 10000, survival_factor = None):
         won = 0;
         for i in range(num):
-            path = self.simulate(start, policy, method);
+            path = self.simulate(start, policy, method, survival_factor = survival_factor);
             if path[-1].player_pos == exit:
                 won += 1;
         
@@ -321,7 +332,7 @@ class Maze:
         horizon = policy.shape[1];
 
         t = 0
-        while t < horizon-1:
+        while t < horizon:
             next_states = set()
             next_num = dict()
             next_prob = dict()
@@ -473,7 +484,7 @@ class Maze:
 
             prev_player_tuple, prev_minotaur_tuple = player_tuple, minotaur_tuple
 
-            if policy is not None:
+            if policy is not None and (policy.ndim == 1 or t < policy.shape[1]):
                 for a in arrows:
                     if a is not None:
                         a.remove()
@@ -641,8 +652,8 @@ def draw_maze(maze):
         cell.set_height(1.0/rows);
         cell.set_width(1.0/cols);
 
-def survival_rates(maze, exit, T_range, minotaur_stay, num = 10000):
-    env = Maze(maze, minotaur_stay = minotaur_stay)
+def survival_rates(maze, exit, T_range, minotaur_stay, avoid_minotaur):
+    env = Maze(maze, minotaur_stay = minotaur_stay, avoid_minotaur = avoid_minotaur)
 
     sr = []
 
