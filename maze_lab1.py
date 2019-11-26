@@ -139,19 +139,17 @@ class Maze:
             :return next state index and corresponding transition prob.
         """
 
-        state_obj = self.states[state]
-
-        if state_obj.is_dead() or self.maze[state_obj.player_pos.unpack()] == 2:
+        if state.is_dead() or self.maze[state.player_pos.unpack()] == 2:
             return [state] # game over
 
         # Compute the future position given current (state, action)
-        new_player_pos = state_obj.player_pos + self.actions[action]
+        new_player_pos = state.player_pos + self.actions[action]
         # Is the future position an impossible one ?
         agent_hitting_maze_walls = not new_player_pos.within(self.maze.shape) or self.maze[new_player_pos.unpack()] == 1
 
         # If we can't move, we stay
         if agent_hitting_maze_walls:
-            new_player_pos = state_obj.player_pos
+            new_player_pos = state.player_pos
 
         minotaur_actions = [Pos(0, -1), Pos(0, 1), Pos(-1, 0), Pos(1, 0)]
 
@@ -161,9 +159,9 @@ class Maze:
         next_states = []
         # keep on picking a new move as long as the chosen move is impossible
         for minotaur_action in minotaur_actions:
-            new_mino_pos = state_obj.minotaur_pos + minotaur_action
+            new_mino_pos = state.minotaur_pos + minotaur_action
             if new_mino_pos.within(self.maze.shape):
-                next_s = self.map[State(new_player_pos, new_mino_pos)]
+                next_s = State(new_player_pos, new_mino_pos)
                 next_states.append(next_s)
 
         return next_states
@@ -183,12 +181,12 @@ class Maze:
         # Compute the transition probabilities
         for s in range(self.n_states):
             for a in range(self.n_actions):
-                next_states = self.__moves(s,a)
+                next_states = self.__moves(self.states[s], a)
 
                 prob = 1.0 / len(next_states)
 
                 for next_s in next_states:
-                    transition_probabilities[next_s, s, a] = prob
+                    transition_probabilities[self.map[next_s], s, a] = prob
 
         return transition_probabilities;
 
@@ -201,14 +199,13 @@ class Maze:
                 state = self.states[s]
 
                 for a in range(self.n_actions):
-                    next_states = self.__moves(s,a)
+                    next_states = self.__moves(state, a)
 
                     # calculate average expected reward over all possible outcomes
                     cumulative_reward = 0.0
-                    for next_s in next_states:
-                        next_state = self.states[next_s]
-
+                    for next_state in next_states:
                         agent_stayed = state.player_pos == next_state.player_pos
+
                         # Reward for hitting a wall
                         if self.maze[next_state.player_pos.unpack()] == 2:
                             cumulative_reward += self.GOAL_REWARD
@@ -238,12 +235,12 @@ class Maze:
         else:
             for s in range(self.n_states):
                  for a in range(self.n_actions):
-                    next_states = self.__moves(s,a)
+                    next_states = self.__moves(self.states[s], a)
 
                     # calculate average expected reward over all possible outcomes
                     cumulative_reward = 0.0
-                    for next_s in next_states:
-                        i,j = self.states[next_s].player_pos.unpack()
+                    for next_state in next_states:
+                        i,j = next_state.player_pos.unpack()
                         cumulative_reward += weights[i][j]
 
                     rewards[s,a] = cumulative_reward / len(next_states)
@@ -261,43 +258,43 @@ class Maze:
             horizon = policy.shape[1];
             # Initialize current state and time
             t = 0;
-            s = self.map[start];
+            s = start;
             # Add the starting position in the maze to the path
             path.append(start);
             while t < horizon-1:
                 # Move to next state given the policy and the current state
-                next_s = self.__move(s, policy[s,t]);
+                next_s = self.__move(s, policy[self.map[s],t]);
                 # Add the position in the maze corresponding to the next state
                 # to the path
-                path.append(self.states[next_s])
+                path.append(next_s)
                 # Update time and state for next iteration
                 t += 1
                 s = next_s
         if method == 'ValIter':
             # Initialize current state, next state and time
             t = 1;
-            s = self.map[start];
+            s = start;
             # Add the starting position in the maze to the path
             path.append(start);
             # Move to next state given the policy and the current state
-            next_s = self.__move(s,policy[s]);
+            next_s = self.__move(s, policy[self.map[s]]);
             # Add the position in the maze corresponding to the next state
             # to the path
-            path.append(self.states[next_s]);
+            path.append(next_s);
             # Loop while state is not the goal state
             while s != next_s:
                 # Update state
                 s = next_s;
                 # Move to next state given the policy and the current state
-                next_s = self.__move(s,policy[s]);
+                next_s = self.__move(s, policy[s]);
                 # Add the position in the maze corresponding to the next state
                 # to the path
-                path.append(self.states[next_s])
+                path.append(next_s)
                 # Update time and state for next iteration
                 t +=1;
         return path
 
-    def surival_rate(self, start, policy, method, exit, num = 10000):
+    def survival_rate(self, start, policy, method, exit, num = 10000):
         won = 0;
         for i in range(num):
             path = self.simulate(start, policy, method);
@@ -305,6 +302,72 @@ class Maze:
                 won += 1;
         
         return won/num
+
+    def survival_rate2(self, start, policy, method, exit):
+        if method not in methods:
+            error = 'ERROR: the argument method must be in {}'.format(methods);
+            raise NameError(error);
+
+        states = set()
+        num_states = dict()
+        prob_states = dict()
+
+        states.add(start)
+        num_states[start] = 1
+        prob_states[start] = 1
+
+        total_num_states = 1
+
+        horizon = policy.shape[1];
+
+        t = 0
+        while t < horizon-1:
+            next_states = set()
+            next_num = dict()
+            next_prob = dict()
+            next_total = 0
+
+            #print("States at {}: unique {}, total {}".format(t, len(states), total_num_states))
+
+            for s in states:
+                s_count = num_states[s]
+                s_prob = prob_states[s]
+
+                action = policy[self.map[s], t]
+                new_states = self.__moves(s, action)
+
+                each_ns_prob = s_prob / len(new_states)
+
+                for ns in new_states:
+                    next_num[ns] = next_num.get(ns, 0) + s_count
+                    next_prob[ns] = next_prob.get(ns, 0) + each_ns_prob
+
+                    next_states.add(ns)
+                    next_total += s_count
+
+            # nothing moving, break
+            if next_states == states:
+                break
+
+            states = next_states
+            num_states = next_num
+            prob_states = next_prob
+            total_num_states = next_total
+
+            t += 1
+
+
+        won = 0
+        dead = 0
+        for state, prob in prob_states.items():
+            if state.player_pos == exit:
+                won += prob
+            elif state.is_dead():
+                dead += prob
+
+        print("T = {}, win {:%}, dead {:%}".format(horizon-1, won, dead))
+
+        return won
 
     def show(self):
         print('The states are :')
@@ -589,6 +652,6 @@ def survival_rates(maze, exit, T_range, minotaur_stay, num = 10000):
     for T in T_range:
         V, policy = dynamic_programming(env, T)
 
-        sr.append(env.surival_rate(start, policy, method, exit))
+        sr.append(env.survival_rate2(start, policy, method, exit))
 
     return sr
