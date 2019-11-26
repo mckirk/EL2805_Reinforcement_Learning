@@ -92,7 +92,7 @@ class Maze:
         """
 
         if avoid_minotaur:
-            self.MINOTAUR_REWARD = -1
+            self.MINOTAUR_REWARD = self.IMPOSSIBLE_REWARD
 
         self.maze                     = maze;
         self.minotaur_stay            = minotaur_stay
@@ -376,7 +376,7 @@ class Maze:
             elif state.is_dead():
                 dead += prob
 
-        print("T = {}, win {:%}, dead {:%}".format(horizon-1, won, dead))
+        print("T = {}, win {:06.2%}, dead {:06.2%}".format(horizon-1, won, dead))
 
         return won
 
