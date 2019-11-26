@@ -84,7 +84,7 @@ class Maze:
     STEP_REWARD = 0
     GOAL_REWARD = 1
     IMPOSSIBLE_REWARD = -100
-    MINOTAUR_REWARD = -1000
+    MINOTAUR_REWARD = 0
 
 
     def __init__(self, maze, weights=None, random_rewards=False, minotaur_stay=False):
